@@ -5,7 +5,6 @@ from .serializers import PixMessageSerializer
 from rest_framework.response import Response
 from .models import PixMessage, PixStream
 from rest_framework.views import APIView
-from rest_framework.decorators import api_view
 from datetime import datetime,  timezone
 from django.http import JsonResponse
 from rest_framework import status
@@ -131,7 +130,13 @@ class PixStreamNextView(APIView):
     pull_next = f"/api/pix/{ispb}/stream/{stream_session.id}"
 
     return _find_session_and_get_response_api(multiple, filtered_receiver_messages, pull_next)
+  
+  def delete(self, request, ispb, interationId):
+    stream_session = PixStream.objects.filter(id=interationId, ispb=ispb).first()
+    stream_session.delete()
+    return Response(data={}, status=status.HTTP_200_OK)
 
+# Função genérica para os retornos das chamadas HTTP GET e evitar repetição de código nas views de stream.
 def _find_session_and_get_response_api(multiple, filtered_receiver_messages, pull_next):
   serializer = PixMessageSerializer(filtered_receiver_messages, many=True)
   
