@@ -1,6 +1,7 @@
-from communication.views import PixMessageView
+from communication.views import PixMessageView,PixStreamStartView
 from django.urls import path
 
 urlpatterns = [
     path('util/msgs/<str:ispb>/<str:number>', PixMessageView.as_view()),
+    path('pix/<str:ispb>/stream/start', PixStreamStartView.as_view())
 ]
