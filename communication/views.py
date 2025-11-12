@@ -5,6 +5,7 @@ from .serializers import PixMessageSerializer
 from rest_framework.response import Response
 from .models import PixMessage, PixStream
 from rest_framework.views import APIView
+from rest_framework.decorators import api_view
 from datetime import datetime,  timezone
 from django.http import JsonResponse
 from rest_framework import status
@@ -92,20 +93,56 @@ class PixStreamStartView(APIView):
       .update(visualizado=True)
     
     # Cria uma nova sessão de stream.
-    session = PixStream.objects.create(ispb=ispb)
-    serializer = PixMessageSerializer(filtered_receiver_messages, many=True)
+    stream_session = PixStream.objects.create(ispb=ispb)
 
     # Forma o link Pull-Next para ser retornado.
-    pull_next = f"/api/pix/{ispb}/stream/{session.id}"
-    
-    # Retorna uma única mensagem com o cabeçalho Pull-Next.
-    if not multiple:
-      response = Response(serializer.data[0], content_type='application/json', status=status.HTTP_200_OK)
-      response["Pull-Next"] = pull_next
-      return response
-    
-    # Retorna múltiplas mensagens com o cabeçalho Pull-Next.
-    response = JsonResponse(serializer.data, safe=False, status=status.HTTP_200_OK)
-    response["Pull-Next"] = pull_next
+    pull_next = f"/api/pix/{ispb}/stream/{stream_session.id}"
 
+    return _find_session_and_get_response_api(multiple, filtered_receiver_messages, pull_next)
+
+  
+class PixStreamNextView(APIView):
+  renderer_classes = [FallbackJSONRenderer]
+
+  def get(self, request, ispb, interationId):
+    stream_session = PixStream.objects.filter(id=interationId, ispb=ispb).first()
+    if not stream_session:
+      return Response({'error': 'Stream session not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    header = request.headers.get('Accept', 'application/json')
+    multiple = header == 'multipart/json'
+    
+    # Busca todas as mensagens não visualizadas.
+    all_receiver_messages = PixMessage.objects.filter(recebedor__ispb=ispb, visualizado=False)
+
+    # Se não houver mensagens, retorna 204 No Content.
+    if len(all_receiver_messages) == 0:
+      return Response(status=status.HTTP_204_NO_CONTENT)
+  
+    # Restringe o número de mensagens (10 no máximo) retornadas com base no cabeçalho Accept enviado.
+    filtered_receiver_messages = list(all_receiver_messages[:10 if multiple else 1])
+    
+    # Marca as mensagens como visualizadas para não serem mais retornadas.
+    all_receiver_messages \
+      .filter(id__in=[msg.id for msg in filtered_receiver_messages]) \
+      .update(visualizado=True)
+    
+    # Forma o link Pull-Next para ser retornado.
+    pull_next = f"/api/pix/{ispb}/stream/{stream_session.id}"
+
+    return _find_session_and_get_response_api(multiple, filtered_receiver_messages, pull_next)
+
+def _find_session_and_get_response_api(multiple, filtered_receiver_messages, pull_next):
+  serializer = PixMessageSerializer(filtered_receiver_messages, many=True)
+  
+  # Retorna uma única mensagem com o cabeçalho Pull-Next.
+  if not multiple:
+    response = Response(serializer.data[0], content_type='application/json', status=status.HTTP_200_OK)
+    response["Pull-Next"] = pull_next
     return response
+  
+  # Retorna múltiplas mensagens com o cabeçalho Pull-Next.
+  response = JsonResponse(serializer.data, safe=False, status=status.HTTP_200_OK)
+  response["Pull-Next"] = pull_next
+
+  return response
