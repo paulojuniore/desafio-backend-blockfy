@@ -1,4 +1,5 @@
 from rest_framework.test import APITestCase
+from communication.models import PixStream
 from faker import Faker
 
 fake = Faker('pt_BR')
@@ -67,3 +68,23 @@ class PixStreamAPITestCase(APITestCase):
     self.assertEqual(stream7.status_code, 429)
     # Verifica a mensagem de erro retornada.
     self.assertEqual(stream7.data['error'], 'Maximum number of active streams reached.')
+
+  # Marca o stream como inativo após obter todas as mensagens.
+  def test_stream_marks_it_inactive(self):
+    # Inicia um stream.
+    start_response = self.client.get('/api/pix/12345678/stream/start')
+    header_response = start_response.headers['Pull-Next']
+    stream_id = header_response.split('/')[-1]
+
+    # Obtém todas as mensagens com o stream ID.
+    header = {'Accept': 'multipart/json'}
+    next_response = self.client.get(f'/api/pix/12345678/stream/{stream_id}', headers=header)
+    self.assertEqual(next_response.status_code, 200)
+    self.assertEqual(len(next_response.data), 6)
+
+    # Marca o stream como inativo (simulando o fim do uso do stream).
+    self.client.delete(f'/api/pix/12345678/stream/{stream_id}')
+
+    # Verifica se o stream foi marcado como inativo após obter todas as mensagens.
+    stream = PixStream.objects.get(id=stream_id)
+    self.assertEqual(stream.is_active, False)
