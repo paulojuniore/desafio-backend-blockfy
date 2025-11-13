@@ -10,6 +10,13 @@ class PixMessage(models.Model):
   txId = models.CharField(max_length=50)
   dataHoraPagamento = models.DateTimeField(auto_now_add=True)
   visualizado = models.BooleanField(default=False)
+  stream = models.ForeignKey(
+    'PixStream', 
+    on_delete=models.CASCADE, 
+    related_name='messages', 
+    null=True, 
+    blank=True
+  )
 
 class PixStream(models.Model):
   id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
