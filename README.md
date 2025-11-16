@@ -57,7 +57,7 @@ Para as rotas de iniciação do stream, comecei com o fluxo básico, onde verifi
 
 Para o controle de streams simultâneos, utilizei de um atributo de controle no model PixStream (is_active) que é inicializado com True sempre que um Stream é criado. No ínicio da função da rota de criação de stream, é realizado um filtro para obter a quantidade de streams que contém o ispb que foi passado por parâmetro e tem seu atributo is_active marcado como true. Então comparo esse valor com uma constante "MAX_STREAMS_PER_ISPB", para validar se já chegou no limite de streams simultâneos (6). Se sim, abortamos a requisição com um status code 429, se não, um novo stream é criado e o status code 200 é retornado.
 
-Para o long pooling, foi criada uma função genérica para retorno das mensagens, que fica repetidamente consultando o banco por mensagens não visualizadas para o recebedor a partir do ispb passado. Se achar mensagens, marca as selecionadas como visualizado=True, serializa-as e retorna um Response(200) com os dados. Se o tempo limite (LONG_POLLING_TIMEOUT) expirar sem novas mensagens, retorna 204 No Content e adiciona um header Pull-Next com a URL do stream.
+Para o long pooling, foi criada uma função genérica para retorno das mensagens, que fica repetidamente consultando o banco por mensagens não visualizadas para o recebedor a partir do ispb passado. Se achar mensagens, marca as selecionadas como visualizado=True, as serialize e retorna um Response(200) com os dados. Se o tempo limite (LONG_POLLING_TIMEOUT) expirar sem novas mensagens, retorna 204 No Content e adiciona um header Pull-Next com a URL do stream.
 
 E por fim, para evitar o acesso simultâneo às mesmas mensagens por diferentes sessões de streams, se fez necessária a utilização de transações. De modo que quando um worker inicia uma transação e pega algumas mensagens, é criado um lock (skip_locked=True), onde essas mensagens ficam indisponíveis para outro worker que tentar acessar o mesmo recurso. A transação encerra e o lock é retirado apenas quando as mensagens são marcadas como visualizadas. Nesse processo, também é criada uma associação entre a mensagem e o stream para garantir consistência e evitar que múltiplos workers processem a mesma mensagem ao mesmo tempo.
 
@@ -68,7 +68,7 @@ O deploy foi realizado em uma instância EC2, utilizando docker e conectado a um
 - Dockerfile para criação de contêiner Docker englobando a API expondo a porta 8000;
 - Criação de instância EC2 na AWS do tipo Ubuntu para deploy;
 - Criação de banco de dados PostgreSQL no RDS;
-- Criação de regras inbound/outbound para comunicação entre API e Banco de dados, além de regra para permitir conexão externa;
+- Criação de security groups com regras inbound/outbound para comunicação entre API e Banco de dados, além de regra para permitir conexão externa;
 - Envio de arquivos do projeto para instância EC2 via SCP;
 - Instalação do Docker na instância EC2;
 - Build da imagem Docker e criação de tabelas;
